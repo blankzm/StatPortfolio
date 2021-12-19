@@ -1,0 +1,114 @@
+---
+title: "Analysis of Rice"
+author: "Zoe Blank"
+date: "3/6/2021; Updated 12/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(lindia)
+library(ggfortify)
+library(GGally)
+library(tidymodels)
+```
+
+## Introduction
+We are looking at a data set containing physiochemical properties and  textural measures of rice. Our analysis will focus on predicting the chewiness of the rice based on the moisture content, amylose content, protein content, water absorption, swelling ratio, pH, and solids content.
+
+#### Data Wrangling
+
+```{r}
+rice <- read.table("~/Desktop/STA 363/Homework 03/rice.txt", header=TRUE) ## read .txt file
+rice <- rice %>%
+  select (chewiness, moistureContent, amyloseContent, proteinContent, waterAbsorption, swellingRatio, pH, solidsContent)   ## select necessary variables
+glimpse(head(rice))
+```
+
+#### Exploratory Data Analysis
+
+```{r}
+ggpairs(rice)
+```
+
+A few of our variables appear to be skewed; for example, moisture content is right-skewed, while amylose content and pH are left-skewed. There are no obvious correlations in our scatterplots with the response variable.
+
+#### Multiple Regression Model and Residual Analysis
+
+```{r, warning = FALSE}
+fit_1 <- lm(chewiness ~ moistureContent + amyloseContent + proteinContent + waterAbsorption + swellingRatio + pH + solidsContent, data=rice) 
+```
+
+```{r, warning = FALSE}
+autoplot(fit_1) 
+```
+
+Our assumption checks are slightly concerning. In the Q-Q plot, there is tailing on both sides, meaning our normality assumption may not be met. There is an outlier in our residuals vs fitted and scale-location plots that seems to be skewing the lines, and we observe a bit of a fanning effect that is concerning- our equal variance and linearity assumptions may not be met. We should likely perform a Box-Cox transformation.
+
+#### Box-Cox Transformation
+
+```{r}
+gg_boxcox(fit_1) 
+```
+
+Our optimal λ suggested is -0.5, corresponding to a transformation of 1/sqrt(chewiness). The range of viable λ is -1.7 to 0.6, which includes transformations such as log10 of chewiness (when λ = 0), cube root of chewiness (when λ = 0.33...), or square root of chewiness (when λ = 0.5).
+
+#### Logarithm Transformation and Updated Residual Analysis
+
+Because our range includes 0, we will do a logarithm transformation; that is, take the log10 of our response variable chewiness.
+
+```{r}
+fit_2 <- lm(log10(chewiness) ~ moistureContent + amyloseContent + proteinContent + waterAbsorption + swellingRatio + pH + solidsContent, data=rice) 
+```
+
+```{r}
+autoplot(fit_2)
+```
+
+Our assumptions appear to be better met with this model. Our Q-Q plot shows that the normality assumption is met. We still see some slight fanning in the residuals vs fitted and scale-locations plots, but it is less extreme than before; there are no obvious patterns, so we can say that the linearity and equal variance assumptions are met, and continue forward with our analysis.
+
+## Analysis
+
+```{r}
+summary(fit_2)
+```
+
+#### Intercept
+
+Our linear model reports an intercept of -2.94, meaning that when all of our predictor variables are 0, we would expect a predicted log10 chewiness measure of -2.94. It does not make sense to interpret this, as we cannot have negative chewiness. Additionally, we do not expect to observe a rice serving where all of the predictor variables are 0.
+
+#### Slope Coefficients
+
+Our slope coefficient for moisture content is 0.1990. This indicates that as moisture content increases by one unit, the expected predicted log10 chewiness rating will increase by 0.1990 units, while holding all other variables constant. Moisture content is a statistically significant predictor with a t value of 2.76 and a p-value of 0.0114.
+
+Our slope coefficient for protein content is 0.1559. This indicates that as protein content increases by one unit, the expected predicted log10 chewiness rating will increase by 0.1559 units, while holding all other variables constant. Protein content is not a statistically significant predictor, as it has a t value of 0.1037 and a p-value of 0.1469.
+
+#### Model Significance
+
+The model reports an F-statistic of 3.763 on 7 and 22 degrees of freedom, and a p-value of 0.007886, meaning that it is statistically significant. According to the adjusted R-squared, the model accounts for about 40.01% of the variability in chewiness.
+
+## Predicting
+
+Objective: Predict the chewiness for a serving of rice with the following values:
+
+* Moisture content of 14.9
+* Amylose content of 22.6
+* Protein content of 8.1
+* Water absorption of 211
+* Swelling ration of 225
+* pH of 6.6
+* Solids content of 5.2
+
+```{r}
+10^predict(fit_2, newdata=data.frame(moistureContent=14.9, 
+                                     amyloseContent=22.6, 
+                                     proteinContent=8.1, 
+                                     waterAbsorption=211, 
+                                     swellingRatio=225, 
+                                     pH=6.6, 
+                                     solidsContent=5.2), int="pred") 
+```
+
+Making sure to account for the logarithm transformation, our predicted chewiness for a rice serving with the given values is 680.33. Further, we can be 95% confident that the observed chewiness for a rice serving with these values will be between 363.30 and 1273.98.

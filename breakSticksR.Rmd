@@ -1,0 +1,182 @@
+---
+title: "Breaking Sticks in R"
+author: "Zoe Blank"
+date: "11/7/2021; Updated 12/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Suppose you have a stick, and without loss of generality it has a length of 1 unit.  Suppose the stick is broken into two pieces and that the breaking point is random -- we are interested in the ratio of the larger piece compared to the smaller piece of the stick.
+
+## Part 1
+
+**Simulate the distribution of the larger to the smaller piece of the stick when the break point is uniformly distributed.** Compute the 5-number summary, mean, standard deviation and a histogram of this simulated distribution.
+
+```{r}
+unifBreak <- function(verbose = FALSE) {
+  breakPt <- runif(1, min = 0, max = 1)
+  left <- breakPt
+  right <- (1 - breakPt)
+  if (left > right) {
+    ratio <- left/right
+  } else {
+    ratio <- right/left
+  }
+  if (verbose) {
+    cat("Break point: ",breakPt,"\n")
+  }
+  ratio
+}
+
+## test our code:
+unifBreak(verbose=TRUE)
+unifBreak(verbose=TRUE)
+unifBreak(verbose=TRUE)
+unifBreak(verbose=TRUE)
+
+## loop 1000 times to view the distribution
+unifBreak_dist <- rep(0, 1000)
+for (i in 1:1000) {
+  unifBreak_dist[i] <- unifBreak()
+}
+summary(unifBreak_dist)
+mean(unifBreak_dist)
+sd(unifBreak_dist)
+hist(unifBreak_dist)
+```
+
+## Part 2
+
+**Write a modified version of the program in Part 1 that allows a user to specify the two shape parameters from a Beta distribution.** The break point is randomly chosen from the corresponding Beta distribution, and the distribution of the ratio of the larger to the smaller piece of the stick is studied.  
+
+```{r}
+betaBreak <- function(shape1, shape2) {
+  breakPt <- rbeta(n=1, shape1 = shape1, shape2 = shape2)
+  left <- breakPt
+  right <- (1 - breakPt)
+  if (left > right) {
+    ratio <- left/right
+  } else {
+    ratio <- right/left
+  }
+  ratio
+}
+
+## test our code:
+betaBreak(shape1 = 4, shape2 = 4)
+betaBreak(shape1 = 4, shape2 = 4)
+betaBreak(shape1 = 4, shape2 = 4)
+betaBreak(shape1 = 4, shape2 = 4)
+```
+
+**How does this distribution compare to that found in Part 1** when both shape parameters take on the value 4?
+
+```{r}
+betaBreak_dist <- rep(0, 1000)
+for (i in 1:1000) {
+  betaBreak_dist[i] <- betaBreak(shape1 = 4, shape2 = 4)
+}
+summary(betaBreak_dist)
+mean(betaBreak_dist)
+sd(betaBreak_dist)
+hist(betaBreak_dist)
+```
+
+Looking at the distribution for part 2 compared to that of part 1, one of the first things we note is that the mean ratio of the part 2 distribution is much smaller than that of part 1. This demonstrates that in part 1, we were more likely to have one piece measure much larger than the other piece. However, in our part 2 distribution, when our break is closer to center, the pieces were more equal (but still not exactly the same).
+
+Further, both the standard deviation and spread from part 1 are much larger than those from part 2. This shows that our break point in part 2 was much more predictable than that from part 1 (which was the goal with the beta distribution). However, this large standard distribution makes it difficult to compare our histrograms, since they have different x-axes.
+
+## Part 3
+
+Consider the situation where the stick is broken into two pieces. Each of the two pieces is then broken into two pieces again -- resulting in 4 total pieces from the original stick. Write a program that allows a user to specify the two shape parameters of a beta distribution, and simulates this scenario where each of the break points is random based on a corresponding Beta distribution. **Calculate the ratio of the largest piece to the smallest pieces (of the 4 pieces) in this scenario.**
+
+```{r}
+betaBreakFour <- function(shape1, shape2, verbose = FALSE) {
+  breakPt <- rbeta(n=1, shape1 = shape1, shape2 = shape2)
+  left <- breakPt
+  right <- (1 - breakPt)
+  
+  ## generate a number between 0 and 1, multiply it by 
+  ## the length of the piece we are breaking:
+  leftBreak <- (rbeta(n=1, shape1 = shape1, shape2 = shape2)) * left
+  
+  ## assign a name to each piece:
+  left1 <- leftBreak
+  left2 <- (left - leftBreak)
+  
+  ## do the same for the right side:
+  rightBreak <- (rbeta(n=1, shape1 = shape1, shape2 = shape2)) * right
+  right1 <- rightBreak
+  right2 <- (right - rightBreak)
+  
+  ## find the smallest:
+  ## note: 'else if' structure learned from CSE 174
+  if (left1 < left2 & (left1 < right1 & left1 < right2)) {
+    smallest <- left1
+  } else if (left2 < left1 & (left2 < right1 & left2 < right2)) {
+    smallest <- left2
+  } else if (right1 < left1 & (right1 < left2 & right1 < right2)) {
+    smallest <- right1
+  } else {
+    smallest <- right2
+  }
+  
+  ## find the largest:
+  if (left1 > left2 && (left1 > right1 && left1 > right2)) {
+    largest <- left1
+  } else if (left2 > left1 && (left2 > right1 && left2 > right2)) {
+    largest <- left2
+  } else if (right1 > left1 && (right1 > left2 && right1 > right2)) {
+    largest <- right1
+  } else {
+    largest <- right2
+  }
+  
+  ratio <- largest / smallest
+  
+  if(verbose) {
+    cat("First Break:\nLeft: ",left," Right: ", right, "\n")
+    cat("Second Breaks: ", left1,left2,right1,right2,"\n")
+    cat("Longest piece: ", largest, " Shortest piece: ", smallest, "\n")
+    cat("Ratio: ", ratio, "\n")
+  }
+  
+  ratio
+}
+betaBreakFour(6, 6, TRUE)
+betaBreakFour(6, 6, FALSE)
+betaBreakFour(6, 6, FALSE)
+```
+
+**Compare/contrast this distribution with that in Parts 1 and 2** when both shape parameters take on the value of 6.
+
+```{r}
+## finding the distribution: 
+betaBreakFour_dist <- rep(0, 1000)
+for (i in 1:1000) {
+  betaBreakFour_dist[i] <- betaBreakFour(shape1 = 6, shape2 = 6, FALSE)
+}
+summary(betaBreakFour_dist)
+mean(betaBreakFour_dist)
+sd(betaBreakFour_dist)
+hist(betaBreakFour_dist)
+```
+
+When comparing our mean ratio from part 3 with part 1, we notice that, once again, the mean from part 1 is much larger than in part 3. This is to be expected when comparing a uniform distribution with a beta distribution. We also note that the mean ratio from part 3 is slightly bigger than that from part 2, which is to be expected, because part 3 is comparing 4 simulated pieces, instead of 2 simulated pieces, and therefore is less likely to have extremely close values.
+
+This is also reflected in the histogram, as we note that part 3 displays fewer ratios close to 1 than part 2. This reflects that there were fewer occurrences during part 3 where the largest piece and the smallest piece were very similar in length compared to the number of times during part 2 that the two pieces were similar in length. This makes sense, because as we add more beta-generated breaks into the code, we add variability, making it less likely that all four pieces are 0.25 (which would result in a ratio of 1).
+
+## Part 4
+
+Write a short paragraph **explaining the overall behavior you see in the distributions** -- try and relate your findings to the process you are simulating.
+
+For Part 1, the uniform distribution, we see a very right-skewed distribution with a lot of spread. This is because when we randomly generate a break point between 0 and 1, we have a chance of computing a very high ratio (meaning the breakpoint is very close to the edge).
+
+For Part 2, our distribution is far less skewed and our spread is much smaller. This is because our breakpoint is more likely to be close to the center using the beta distribution, yeilding a ratio closer to 1.
+
+For Part 3, our mean is greater than that of part 2 because we are now comparing 2 of 4 pieces generated using 3 beta distribution simulations. This means that the likelihood of the largest piece and smallest piece of these four being close enough to yield a ratio close to 1 is very small - we see more variability between our largest and smallest pieces, and thus, a larger mean ratio.
