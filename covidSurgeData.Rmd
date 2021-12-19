@@ -1,0 +1,112 @@
+---
+title: "COVID Surge Calculation"
+author: "Zoe Blank"
+date: "10/3/2021; Updated 12/19/2021"
+output: html_document
+---
+
+**purpose:** Calculate and compare COVID-19 rates in each Ohio county between last year's winter surge and the current Delta wave. 
+
+
+Load the tidyverse package and read in the data:
+```{r, message=FALSE}
+library(tidyverse)
+OhioCovidDash <-
+  read_csv("https://coronavirus.ohio.gov/static/dashboards/COVIDDeathData_CountyOfResidence.csv")
+OhioPopData <- 
+  read_csv("https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/asrh/cc-est2019-agesex-39.csv")
+```
+
+Remove the word "County" from the variable names in the population dataset, select the correct year, and select the necessary variables:
+```{r}
+OhioPopData <- OhioPopData %>% 
+  mutate(County = str_remove(CTYNAME, " County")) %>% 
+  filter(YEAR == 12) %>% 
+  select(County, Population = POPESTIMATE)
+glimpse(OhioPopData)
+```
+
+Remove observations of non-adults (less than 20 years old) from the covid dashboard dataset and filter out unkown county variables:
+```{r}
+OhioCovidDash <- OhioCovidDash %>% 
+  filter(`Age Range` != "0-19") %>% 
+  filter(County != "Unknown")
+glimpse(OhioCovidDash)
+```
+
+Selecting necessary variables in the covid dataset (county, age range, case count, and COVID onset date):
+```{r}
+OhioCovidDash <- OhioCovidDash %>% 
+  select(County, `Age Range`, `Case Count`, `Onset Date`)
+glimpse(OhioCovidDash)
+```
+
+Filter the dates to match the winter surge or delta wave, creating a dataset for each difference surge:
+```{r}
+OhioCovidDelta <- OhioCovidDash %>% 
+  filter(`Onset Date` > as.Date("2021-06-30")) %>% 
+  mutate(Surge = "Delta")
+glimpse(OhioCovidDelta)
+
+OhioCovidWinter <- OhioCovidDash %>% 
+  filter(`Onset Date` > as.Date("2020-09-30")) %>%
+  filter(`Onset Date` < as.Date("2021-03-01")) %>%
+  mutate(Surge = "Winter")
+glimpse(OhioCovidWinter)
+```
+
+Combine the two different surge datasets:
+```{r}
+OhioCovid <- merge(OhioCovidDelta,
+                            OhioCovidWinter,
+                            all.x=TRUE, all.y=TRUE)
+glimpse(OhioCovid)
+unique(OhioCovid$Surge)       ## verify that both winter and delta were included
+```
+
+Combine population and covid dashboard datasets:
+```{r}
+ohio_covid_pop <- merge(OhioCovid,
+                           OhioPopData,
+                           all.x=TRUE, all.y=TRUE)
+glimpse(ohio_covid_pop)
+```
+
+Add up case counts per county and create a variable for cases per 1000 residents:
+```{r, message=FALSE}
+ohio_covid_pop <- ohio_covid_pop %>% 
+  group_by(County, Surge, Population) %>% 
+  summarize(Cases = sum(`Case Count`))
+glimpse(ohio_covid_pop)
+
+ohio_covid_pop <- ohio_covid_pop %>% 
+  mutate(Case_rate = Cases/Population*1000)
+glimpse(ohio_covid_pop)
+```
+
+Determine which counties had the highest and lowest COVID-19 rate in the winter surge, and which counties had (have) the highest and lowest rates in the delta wave:
+
+```{r}
+Covid_Winter_arrange <- ohio_covid_pop %>% 
+  filter(Surge == "Winter") %>% 
+  arrange(Case_rate)
+
+head(Covid_Winter_arrange)
+tail(Covid_Winter_arrange)
+``` 
+**The county with the highest case rate from the Winter surge is Putnam at 87.5 cases per 1000 residents, and the county with the lowest case rate from the Winter surge is Holmes at 41.2 cases per 1000 residents.**
+
+
+```{r}
+Covid_Delta_arrange <- ohio_covid_pop %>% 
+  filter(Surge == "Delta") %>% 
+  arrange(Case_rate)
+
+head(Covid_Delta_arrange)
+tail(Covid_Delta_arrange)
+``` 
+**The county with the highest case rate from the Delta wave is Pike at 45.3 cases per 1000 residents, and the county with the lowest surge from the Delta wave is Ashtabula at 12.5 cases per 1000 residents.**
+
+**When comparing the case rates between the winter and now, we can observe that the case rates in the winter were much higher - that is, more people (per thousand) had COVID during the initial winter surge compared to the current Delta wave.**
+
+**We also note that (despite the rare exceptions of Holmes, Geauga, and Ashtabula) there wasn't much similarity between the counties with either the highest case rates or the lowest case rates between the two different surges. That is, no counties were consistently the highest or consistently the lowest across surges.**
